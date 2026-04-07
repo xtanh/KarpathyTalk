@@ -1247,22 +1247,32 @@ func (app *App) ToggleFollow(followerID, followingID int64) (following bool, err
 		return false, fmt.Errorf("cannot follow yourself")
 	}
 
+	tx, err := app.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
 	var count int
-	err = app.DB.QueryRow(`SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = ?`,
+	err = tx.QueryRow(`SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = ?`,
 		followerID, followingID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
 
 	if count > 0 {
-		_, err = app.DB.Exec(`DELETE FROM follows WHERE follower_id = ? AND following_id = ?`,
-			followerID, followingID)
-		return false, err
+		if _, err = tx.Exec(`DELETE FROM follows WHERE follower_id = ? AND following_id = ?`,
+			followerID, followingID); err != nil {
+			return false, err
+		}
+		return false, tx.Commit()
 	}
 
-	_, err = app.DB.Exec(`INSERT INTO follows (follower_id, following_id) VALUES (?, ?)`,
-		followerID, followingID)
-	return true, err
+	if _, err = tx.Exec(`INSERT INTO follows (follower_id, following_id) VALUES (?, ?)`,
+		followerID, followingID); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 func (app *App) IsFollowing(followerID, followingID int64) bool {

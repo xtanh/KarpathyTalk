@@ -230,6 +230,61 @@ func TestGetFollowingTimelinePosts(t *testing.T) {
 	}
 }
 
+func TestToggleFollowTogglesState(t *testing.T) {
+	app := newTestApp(t)
+
+	me, err := app.UpsertUser(1, "me", "Me", "https://example.com/me.png")
+	if err != nil {
+		t.Fatalf("UpsertUser(me): %v", err)
+	}
+	other, err := app.UpsertUser(2, "other", "Other", "https://example.com/other.png")
+	if err != nil {
+		t.Fatalf("UpsertUser(other): %v", err)
+	}
+
+	following, err := app.ToggleFollow(me.ID, other.ID)
+	if err != nil {
+		t.Fatalf("ToggleFollow(follow): %v", err)
+	}
+	if !following {
+		t.Fatal("ToggleFollow follow = false, want true")
+	}
+	if !app.IsFollowing(me.ID, other.ID) {
+		t.Fatal("IsFollowing after follow = false, want true")
+	}
+
+	following, err = app.ToggleFollow(me.ID, other.ID)
+	if err != nil {
+		t.Fatalf("ToggleFollow(unfollow): %v", err)
+	}
+	if following {
+		t.Fatal("ToggleFollow unfollow = true, want false")
+	}
+	if app.IsFollowing(me.ID, other.ID) {
+		t.Fatal("IsFollowing after unfollow = true, want false")
+	}
+}
+
+func TestToggleFollowRejectsSelfFollow(t *testing.T) {
+	app := newTestApp(t)
+
+	me, err := app.UpsertUser(1, "me", "Me", "https://example.com/me.png")
+	if err != nil {
+		t.Fatalf("UpsertUser(me): %v", err)
+	}
+
+	following, err := app.ToggleFollow(me.ID, me.ID)
+	if err == nil {
+		t.Fatal("ToggleFollow(self) error = nil, want error")
+	}
+	if following {
+		t.Fatal("ToggleFollow(self) = true, want false")
+	}
+	if app.IsFollowing(me.ID, me.ID) {
+		t.Fatal("self follow row was created")
+	}
+}
+
 func TestGetActivityItems(t *testing.T) {
 	app := newTestApp(t)
 
