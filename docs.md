@@ -128,3 +128,7 @@ Examples:
 Per-user RSS is available at:
 
 - `GET https://karpathytalk.com/user/{username}/feed.xml`
+
+Authenticated users can also subscribe to their following timeline:
+
+- `GET https://karpathytalk.com/feed.xml?tab=following`

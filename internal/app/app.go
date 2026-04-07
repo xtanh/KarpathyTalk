@@ -41,6 +41,7 @@ func (app *App) Handler() http.Handler {
 
 	// Timeline
 	mux.HandleFunc("GET /", app.handleTimeline)
+	mux.HandleFunc("GET /feed.xml", app.requireAuth(app.handleFollowingRSS))
 
 	// Docs + read API
 	mux.HandleFunc("GET /docs", app.handleDocs)

@@ -11,6 +11,14 @@ import (
 
 const userRSSLimit = 50
 
+type rssFeedMeta struct {
+	Title       string
+	Link        string
+	Description string
+	FeedURL     string
+	Username    string
+}
+
 type rssDocument struct {
 	XMLName xml.Name   `xml:"rss"`
 	Version string     `xml:"version,attr"`
@@ -69,15 +77,51 @@ func (app *App) handleUserRSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profileURL := app.absoluteURL(fmt.Sprintf("/user/%s", profile.Username))
-	feedURL := app.absoluteURL(fmt.Sprintf("/user/%s/feed.xml", profile.Username))
+	app.writeRSS(w, posts, rssFeedMeta{
+		Title:       fmt.Sprintf("@%s on KarpathyTalk", profile.Username),
+		Link:        app.absoluteURL(fmt.Sprintf("/user/%s", profile.Username)),
+		Description: fmt.Sprintf("Recent posts by @%s on KarpathyTalk", profile.Username),
+		FeedURL:     app.absoluteURL(fmt.Sprintf("/user/%s/feed.xml", profile.Username)),
+		Username:    profile.Username,
+	})
+}
 
+func (app *App) handleFollowingRSS(w http.ResponseWriter, r *http.Request) {
+	user := GetCurrentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	posts, err := app.GetFollowingTimelinePosts(user.ID, userRSSLimit, 0)
+	if err != nil {
+		http.Error(w, "Failed to load feed.", http.StatusInternalServerError)
+		return
+	}
+	if err := app.HydratePosts(posts, user.ID); err != nil {
+		http.Error(w, "Failed to load feed.", http.StatusInternalServerError)
+		return
+	}
+
+	app.writeRSS(w, posts, rssFeedMeta{
+		Title:       fmt.Sprintf("@%s following feed on KarpathyTalk", user.Username),
+		Link:        app.absoluteURL("/?tab=following"),
+		Description: fmt.Sprintf("Recent posts from @%s and followed users on KarpathyTalk", user.Username),
+		FeedURL:     app.absoluteURL("/feed.xml?tab=following"),
+		Username:    user.Username,
+	})
+}
+
+func (app *App) writeRSS(w http.ResponseWriter, posts []*Post, meta rssFeedMeta) {
 	items := make([]rssItem, 0, len(posts))
-	lastBuildDate := profile.CreatedAt
+	lastBuildDate := time.Now()
+	if len(posts) > 0 {
+		lastBuildDate = posts[0].CreatedAt
+	}
 	for _, post := range posts {
 		postURL := app.absoluteURL(fmt.Sprintf("/posts/%d", post.ID))
 		items = append(items, rssItem{
-			Title:       feedItemTitle(post.Content, profile.Username),
+			Title:       feedItemTitle(post.Content, meta.Username),
 			Link:        postURL,
 			GUID:        rssGUID{IsPermaLink: "true", Value: postURL},
 			PubDate:     post.CreatedAt.Format(time.RFC1123Z),
@@ -96,13 +140,13 @@ func (app *App) handleUserRSS(w http.ResponseWriter, r *http.Request) {
 		Version: "2.0",
 		AtomNS:  "http://www.w3.org/2005/Atom",
 		Channel: rssChannel{
-			Title:         fmt.Sprintf("@%s on KarpathyTalk", profile.Username),
-			Link:          profileURL,
-			Description:   fmt.Sprintf("Recent posts by @%s on KarpathyTalk", profile.Username),
+			Title:         meta.Title,
+			Link:          meta.Link,
+			Description:   meta.Description,
 			Language:      "en-us",
 			LastBuildDate: lastBuildDate.Format(time.RFC1123Z),
 			AtomLink: rssAtomLink{
-				Href: feedURL,
+				Href: meta.FeedURL,
 				Rel:  "self",
 				Type: "application/rss+xml",
 			},

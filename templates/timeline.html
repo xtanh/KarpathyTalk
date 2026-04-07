@@ -9,6 +9,13 @@
         <a href="/login" class="btn btn-link btn-sm">Following</a>
         {{end}}
     </div>
+    {{if and .CurrentUser (eq .ActiveTab "following")}}
+    <div class="timeline-feed-link">
+        <a href="/feed.xml?tab=following" class="profile-icon-link" title="Following RSS feed" aria-label="Following RSS feed">
+            RSS for following
+        </a>
+    </div>
+    {{end}}
     <div class="welcome-banner" data-welcome-banner>
         <div class="welcome-banner-copy">
             <p><strong>Welcome to KarpathyTalk.</strong> <a href="/posts/5">Read the manifesto</a>.</p>
